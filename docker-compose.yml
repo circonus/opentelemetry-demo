@@ -734,6 +734,29 @@ services:
       - "21892"
     logging: *logging
 
+  vector:
+    image: timberio/vector:0.33.0-debian
+    container_name: vector
+    volumes:
+      - ./src/vector/vector.toml:/etc/vector/vector.toml:ro
+    ports:
+      - "8686:8686"
+
+  ddagent:
+    image: datadog/agent:7
+    container_name: dd-agent
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE}
+      - DD_HOSTNAME=${DD_HOSTNAME}
+    # pid: host
+    # cgroup: host
+    volumes:
+      - ./src/dd-agent/datadog.yaml:/etc/datadog-agent/datadog.yaml
+    # - /var/run/docker.sock:/var/run/docker.sock:ro
+    # - /proc/:/host/proc/:ro
+    # - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+
   telegraf:
     image: telegraf:1.28.2
     container_name: telegraf
