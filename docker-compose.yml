@@ -659,7 +659,17 @@ services:
       resources:
         limits:
           memory: 125M
-    restart: unless-stopped
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://circonus-am:43285/config/otelcol || exit 1",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
     command:
       [
         "--config=/etc/otelcol-config.yml",
@@ -737,6 +747,17 @@ services:
   vector:
     image: timberio/vector:0.33.0-debian
     container_name: vector
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://circonus-am:43285/config/vector || exit 1",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
     volumes:
       - ./src/vector/vector.toml:/etc/vector/vector.toml:ro
     ports:
@@ -745,6 +766,17 @@ services:
   ddagent:
     image: datadog/agent:7
     container_name: dd-agent
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://circonus-am:43285/config/datadog-agent || exit 1",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
     environment:
       - DD_API_KEY=${DD_API_KEY}
       - DD_SITE=${DD_SITE}
@@ -760,6 +792,17 @@ services:
   telegraf:
     image: telegraf:1.28.2
     container_name: telegraf
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://circonus-am:43285/config/telegraf || exit 1",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
     volumes:
       - ./src/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
     environment:
@@ -771,6 +814,39 @@ services:
       - prometheus
       - redis-cart
       - ffs_postgres
+
+  circonus-am:
+    image: circonus/circonus-am:v0.3.7
+    container_name: circonus-am
+    volumes:
+      - ./src/circonus-am/circonus-am.yaml:/cam/etc/circonus-am.yaml
+      - ./src/circonus-am/etc/.id/mid:/cam/etc/.id/mid
+      - ./src/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+      - ./src/otelcollector/otelcol-config.yml:/etc/otelcol/otelcol.conf
+      - ./src/dd-agent/datadog.yml:/opt/datadog-agent/etc/datadog.yaml
+      - ./src/vector/vector.toml:/etc/vector/vector.toml
+
+    environment:
+      - FFS_POSTGRES_USER=ffs
+      - FFS_POSTGRES_DB=ffs
+      - FFS_POSTGRES_PASSWORD=ffs
+      - REDIS_ADDR=${REDIS_ADDR}
+      - CAM_REGISTER=${CAM_REGISTER}
+      - CAM_USE_MACHINE_ID=false
+      - CAM_INSTANCE_ID=dockerdemo
+    depends_on:
+      - prometheus
+      - redis-cart
+      - ffs_postgres
+  autoheal:
+    image: willfarrell/autoheal:latest
+    tty: true
+    container_name: autoheal
+    restart: always
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   # *****
   # Tests

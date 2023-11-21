@@ -39,6 +39,11 @@ src/frontend/cypress/videos
 src/frontend/cypress/screenshots
 src/shippingservice/target/
 
+/src/circonus-am/etc/.id/ai
+/src/circonus-am/etc/.id/jt
+/src/circonus-am/etc/.id/rft
+
+
 # Ignore copied/generated protobuf files
 /src/cartservice/src/protos/
 /src/featureflagservice/proto/
