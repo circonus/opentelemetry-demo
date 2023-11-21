@@ -1,4 +1,5 @@
 <!-- markdownlint-disable-next-line -->
+
 # <img src="https://opentelemetry.io/img/logos/opentelemetry-logo-nav.png" alt="OTel logo" width="45"> OpenTelemetry Demo
 
 [![Slack](https://img.shields.io/badge/slack-@cncf/otel/demo-brightgreen.svg?logo=slack)](https://cloud-native.slack.com/archives/C03B4CWV4DA)
@@ -6,6 +7,30 @@
 [![Commits](https://img.shields.io/github/commits-since/open-telemetry/opentelemetry-demo/latest?color=ff69b4&include_prereleases)](https://github.com/open-telemetry/opentelemetry-demo/graphs/commit-activity)
 [![Downloads](https://img.shields.io/docker/pulls/otel/demo)](https://hub.docker.com/r/otel/demo)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?color=red)](https://github.com/open-telemetry/opentelemetry-demo/blob/main/LICENSE)
+
+## Circonus Passport Demo Fork
+
+This repository is designed to help you explore [Circonus Passport](https://www.circonus.com/passport/). Passport is an agent orchestration platform. Any observability agent that can be managed through configuration files can be managed by Passport.
+
+While Passport is more naturally suited to server based deployments, it's hard to beat the convenience of the OTEL demo for exploring new observability offerings.
+
+### Agents in this project
+
+- Telegraf
+- Fluent-bit
+- Vector
+- OTEL Collector
+- Datadog Agent
+
+You can easily add your own agent following the pattern used by the agents above.
+
+### Setup
+
+In the .env file add the agent manager registration token you got from the Passport UI to the `CAM_REGISTER` variable. Do the same for `DD_API_KEY` if evaluating the datadog agent. The last recommendation is to add some more tags to the `circonus-am.yaml` file while will allow you to write some more complex assignment rules in Passport.
+
+### How it works
+
+The way this project works is through shared file mounts between the [Passport Agent Manager](https://github.com/circonus/agent-manager) and the agents it manages. The agent manager will pull down any new configs from Passport and update the corresponding file on the shared volume mount. It will then publish an endpoint that will allow the target agent to fail it's health check. Docker compose does not automatically restart unhealthy containers, so we are using a utility called [autoheal](https://github.com/willfarrell/docker-autoheal) which will restart unhealthy containers. When the container comes back online it will start collecting using the new configuration file that was fetched by the agent manager.
 
 ## Welcome to the OpenTelemetry Astronomy Shop Demo
 
@@ -54,7 +79,7 @@ adding a link below. The community is committed to maintaining the project and
 keeping it up to date for you.
 
 |                                         |                             |                                                                |
-|-----------------------------------------|-----------------------------|----------------------------------------------------------------|
+| --------------------------------------- | --------------------------- | -------------------------------------------------------------- |
 | [AlibabaCloud LogService][AlibabaCloud] | [Elastic][Elastic]          | [OpenSearch][OpenSearch]                                       |
 | [AppDynamics][AppDynamics]              | [Grafana Labs][GrafanaLabs] | [Sentry][Sentry]                                               |
 | [Aspecto][Aspecto]                      | [Guance][Guance]            | [ServiceNow Cloud Observability][ServiceNowCloudObservability] |

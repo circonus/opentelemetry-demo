@@ -1,7 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-version: '3.9'
+version: "3.9"
 x-default-logging: &logging
   driver: "json-file"
   options:
@@ -172,7 +172,7 @@ services:
     environment:
       - CURRENCY_SERVICE_PORT
       - OTEL_EXPORTER_OTLP_ENDPOINT
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.name=currencyservice   # The C++ SDK does not support OTEL_SERVICE_NAME
+      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.name=currencyservice # The C++ SDK does not support OTEL_SERVICE_NAME
     depends_on:
       otelcol:
         condition: service_started
@@ -219,8 +219,8 @@ services:
           memory: 175M
     restart: unless-stopped
     ports:
-      - "${FEATURE_FLAG_SERVICE_PORT}"                                  # Feature Flag Service UI
-      - "${FEATURE_FLAG_GRPC_SERVICE_PORT}"                             # Feature Flag Service gRPC API
+      - "${FEATURE_FLAG_SERVICE_PORT}" # Feature Flag Service UI
+      - "${FEATURE_FLAG_GRPC_SERVICE_PORT}" # Feature Flag Service gRPC API
     environment:
       - FEATURE_FLAG_SERVICE_PORT
       - FEATURE_FLAG_GRPC_SERVICE_PORT
@@ -229,7 +229,15 @@ services:
       - OTEL_SERVICE_NAME=featureflagservice
       - DATABASE_URL=ecto://ffs:ffs@ffs_postgres:5432/ffs
     healthcheck:
-      test: ["CMD", "curl", "-H", "baggage: synthetic_request=true", "-f", "http://localhost:${FEATURE_FLAG_SERVICE_PORT}"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-H",
+          "baggage: synthetic_request=true",
+          "-f",
+          "http://localhost:${FEATURE_FLAG_SERVICE_PORT}",
+        ]
     depends_on:
       ffs_postgres:
         condition: service_healthy
@@ -484,7 +492,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 500M               # This is high to enable supporting the recommendationCache feature flag use case
+          memory: 500M # This is high to enable supporting the recommendationCache feature flag use case
     restart: unless-stopped
     ports:
       - "${RECOMMENDATION_SERVICE_PORT}"
@@ -601,7 +609,6 @@ services:
       - "${REDIS_PORT}"
     logging: *logging
 
-
   # ********************
   # Telemetry Components
   # ********************
@@ -621,8 +628,8 @@ services:
           memory: 300M
     restart: unless-stopped
     ports:
-      - "${JAEGER_SERVICE_PORT}"         # Jaeger UI
-      - "4317"                           # OTLP gRPC default port
+      - "${JAEGER_SERVICE_PORT}" # Jaeger UI
+      - "4317" # OTLP gRPC default port
     environment:
       - METRICS_STORAGE_TYPE=prometheus
     logging: *logging
@@ -652,14 +659,28 @@ services:
       resources:
         limits:
           memory: 125M
-    restart: unless-stopped
-    command: [ "--config=/etc/otelcol-config.yml", "--config=/etc/otelcol-config-extras.yml" ]
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://circonus-am:43285/config/otelcol || exit 1",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
+    command:
+      [
+        "--config=/etc/otelcol-config.yml",
+        "--config=/etc/otelcol-config-extras.yml",
+      ]
     volumes:
       - ./src/otelcollector/otelcol-config.yml:/etc/otelcol-config.yml
       - ./src/otelcollector/otelcol-config-extras.yml:/etc/otelcol-config-extras.yml
     ports:
-      - "4317"          # OTLP over gRPC receiver
-      - "4318"          # OTLP over HTTP receiver
+      - "4317" # OTLP over gRPC receiver
+      - "4318" # OTLP over HTTP receiver
     depends_on:
       - jaeger
     logging: *logging
@@ -680,6 +701,8 @@ services:
       - --web.route-prefix=/
       - --enable-feature=exemplar-storage
       - --enable-feature=otlp-write-receiver
+      - "--web.enable-remote-write-receiver"
+
     volumes:
       - ./src/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml
     deploy:
@@ -720,6 +743,110 @@ services:
     ports:
       - "21892"
     logging: *logging
+
+  vector:
+    image: timberio/vector:0.33.0-debian
+    container_name: vector
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://circonus-am:43285/config/vector || exit 1",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
+    volumes:
+      - ./src/vector/vector.toml:/etc/vector/vector.toml:ro
+    ports:
+      - "8686:8686"
+
+  ddagent:
+    image: datadog/agent:7
+    container_name: dd-agent
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://circonus-am:43285/config/datadog-agent || exit 1",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE}
+      - DD_HOSTNAME=${DD_HOSTNAME}
+    # pid: host
+    # cgroup: host
+    volumes:
+      - ./src/dd-agent/datadog.yaml:/etc/datadog-agent/datadog.yaml
+    # - /var/run/docker.sock:/var/run/docker.sock:ro
+    # - /proc/:/host/proc/:ro
+    # - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+
+  telegraf:
+    image: telegraf:1.28.2
+    container_name: telegraf
+    restart: always
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --silent --fail http://circonus-am:43285/config/telegraf || exit 1",
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 1
+      start_period: 10s
+    volumes:
+      - ./src/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+    environment:
+      - FFS_POSTGRES_USER=ffs
+      - FFS_POSTGRES_DB=ffs
+      - FFS_POSTGRES_PASSWORD=ffs
+      - REDIS_ADDR=${REDIS_ADDR}
+    depends_on:
+      - prometheus
+      - redis-cart
+      - ffs_postgres
+
+  circonus-am:
+    image: circonus/circonus-am:v0.3.7
+    container_name: circonus-am
+    volumes:
+      - ./src/circonus-am/circonus-am.yaml:/cam/etc/circonus-am.yaml
+      - ./src/circonus-am/etc/.id/mid:/cam/etc/.id/mid
+      - ./src/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf
+      - ./src/otelcollector/otelcol-config.yml:/etc/otelcol/otelcol.conf
+      - ./src/dd-agent/datadog.yml:/opt/datadog-agent/etc/datadog.yaml
+      - ./src/vector/vector.toml:/etc/vector/vector.toml
+
+    environment:
+      - FFS_POSTGRES_USER=ffs
+      - FFS_POSTGRES_DB=ffs
+      - FFS_POSTGRES_PASSWORD=ffs
+      - REDIS_ADDR=${REDIS_ADDR}
+      - CAM_REGISTER=${CAM_REGISTER}
+      - CAM_USE_MACHINE_ID=false
+      - CAM_INSTANCE_ID=dockerdemo
+    depends_on:
+      - prometheus
+      - redis-cart
+      - ffs_postgres
+  autoheal:
+    image: willfarrell/autoheal:latest
+    tty: true
+    container_name: autoheal
+    restart: always
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   # *****
   # Tests
@@ -855,7 +982,7 @@ services:
       otelcol:
         condition: service_started
     healthcheck:
-      test: [ "CMD", "wget", "--spider", "localhost:11633" ]
+      test: ["CMD", "wget", "--spider", "localhost:11633"]
       interval: 1s
       timeout: 3s
       retries: 60
